@@ -1,7 +1,9 @@
 from django.db.models.functions import Now
 from django.utils import timezone
 from django.db.models import Count
-from django.views.generic import CreateView, DetailView, DeleteView, ListView, UpdateView
+from django.views.generic import (
+    CreateView, DetailView, DeleteView, ListView, UpdateView
+)
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect

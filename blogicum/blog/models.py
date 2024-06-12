@@ -86,13 +86,14 @@ class Post(PublishedModel):
         ordering = ('-pub_date',)
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
-        
+
     def get_absolute_url(self):
         return reverse('blog:post_detail', kwargs={'post_id': self.pk})
 
     def __str__(self):
         return self.title
-    
+
+
 class Comment(models.Model):
     text = models.TextField('Текст комментария')
     author = models.ForeignKey(
