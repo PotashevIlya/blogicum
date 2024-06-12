@@ -1,14 +1,12 @@
 from django.db.models.functions import Now
+from django.utils import timezone
 from django.db.models import Count
-from django.db.models.query import QuerySet
-from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, DeleteView, ListView, UpdateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse_lazy
 from django.utils import timezone
-
-
 
 
 from .models import Category, Comment, Post, User
@@ -24,7 +22,7 @@ def post_filter(posts):
         pub_date__lte=Now(),
         is_published=True,
         category__is_published=True
-    ).order_by('-pub_date')
+    ).order_by(*Post._meta.ordering)
 
 
 class UserIsAuthorMixin:
@@ -34,6 +32,66 @@ class UserIsAuthorMixin:
             return super().dispatch(request, *args, **kwargs)
         return redirect('blog:post_detail',
                         self.kwargs['post_id'])
+
+
+class IndexListView(ListView):
+    model = Post
+    template_name = 'blog/index.html'
+    context_object_name = 'paje_obj'
+    paginate_by = POST_ON_PAGE
+
+    def get_queryset(self):
+        return post_filter(Post.objects).annotate(
+            comment_count=Count('comments')
+        )
+
+
+class PostDetailView(DetailView):
+    model = Post
+    form_class = PostForm
+    template_name = 'blog/detail.html'
+    pk_url_kwarg = 'post_id'
+
+    def dispatch(self, request, *args, **kwargs):
+        post = self.get_object()
+        if ((not post.is_published
+            or not post.category.is_published
+            or post.pub_date >= timezone.now())
+                and request.user != post.author):
+            raise Http404('Такого поста не существует')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['post'] = get_object_or_404(
+            Post,
+            id=self.kwargs['post_id']
+        )
+        context['comments'] = self.object.comments.select_related(
+            'author').order_by(*Comment._meta.ordering)
+        context['form'] = CommentForm()
+        return context
+
+
+class CategoryListView(ListView):
+    model = Post
+    template_name = 'blog/category.html'
+    paginate_by = POST_ON_PAGE
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        category = get_object_or_404(
+            Category,
+            slug=self.kwargs['category_slug'],
+            is_published=True
+        )
+        context['category'] = category
+        return context
+
+    def get_queryset(self):
+        return post_filter(Post.objects).filter(
+            category__slug=self.kwargs['category_slug']
+        ).annotate(comment_count=Count('comments'))
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -94,19 +152,20 @@ class ProfileDetailView(ListView):
             return Post.objects.select_related('author').filter(
                 author__username=self.kwargs['username']
             ).annotate(comment_count=Count('comments')
-                       ).order_by('-pub_date')
+                       ).order_by(*Post._meta.ordering)
         return Post.objects.select_related('author').filter(
             author__username=self.kwargs['username'],
             pub_date__lte=Now()
         ).annotate(comment_count=Count('comments')
-                   ).order_by('-pub_date')
+                   ).order_by(*Post._meta.ordering)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['profile'] = get_object_or_404(User, username=self.kwargs['username'])
+        context['profile'] = get_object_or_404(
+            User, username=self.kwargs['username'])
         return context
 
-  
+
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     model = User
     pk_url_kwarg = 'username'
@@ -122,64 +181,6 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
             'blog:profile',
             args=[username]
         )
-
-
-class IndexListView(ListView):
-    model = Post
-    template_name = 'blog/index.html'
-    context_object_name = 'paje_obj'
-    paginate_by = POST_ON_PAGE
-
-    def get_queryset(self):
-        return post_filter(Post.objects).annotate(comment_count=Count('comments'))
-
-   
-class PostDetailView(DetailView):
-    model = Post
-    form_class = PostForm
-    template_name = 'blog/detail.html'
-    pk_url_kwarg = 'post_id'
-    
-    def dispatch(self, request, *args, **kwargs):
-        post = self.get_object()
-        if ((not post.is_published
-            or not post.category.is_published
-            or post.pub_date >= timezone.now())
-            and request.user != post.author):
-            raise Http404('Такого поста не существует')
-        return super().dispatch(request, *args, **kwargs)
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['post'] = get_object_or_404(Post, id=self.kwargs['post_id'])
-        context['comments'] = (
-            self.object.comments.select_related('author').order_by('created_at')
-        )
-        context['form'] = CommentForm()
-        return context
-
-
-class CategoryListView(ListView):
-    model = Post
-    template_name = 'blog/category.html'
-    paginate_by = POST_ON_PAGE
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        category = get_object_or_404(
-            Category,
-            slug=self.kwargs['category_slug'],
-            is_published=True
-        )
-        context['category'] = category
-        return context
-
-    def get_queryset(self):
-        return super().get_queryset().filter(
-            is_published=True,
-            category__slug=self.kwargs['category_slug'],
-            pub_date__lte=Now()
-        ).annotate(comment_count=Count('comments')).order_by('-pub_date')
 
 
 class CommentCreateView(LoginRequiredMixin, CreateView):
