@@ -63,7 +63,6 @@ class Post(PublishedModel):
         null=False,
         blank=True,
         verbose_name='Автор публикации',
-        related_name='posts'
     )
     location = models.ForeignKey(
         Location,
@@ -71,14 +70,12 @@ class Post(PublishedModel):
         null=True,
         blank=True,
         verbose_name='Местоположение',
-        related_name='posts'
     )
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name='Категория',
-        related_name='posts'
     )
     image = models.ImageField('Фото', upload_to='posts_images', blank=True)
 
@@ -86,6 +83,7 @@ class Post(PublishedModel):
         ordering = ('-pub_date',)
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
+        default_related_name = 'posts'
 
     def get_absolute_url(self):
         return reverse('blog:post_detail', kwargs={'post_id': self.pk})
@@ -99,14 +97,12 @@ class Comment(models.Model):
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        blank=True,
-        verbose_name='Автор комментария'
+        verbose_name='Автор',
+        related_name='comments',
     )
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        blank=True,
-        null=True,
         related_name='comments',
     )
     created_at = models.DateTimeField('Добавлено', auto_now_add=True)
