@@ -83,15 +83,21 @@ class CategoryListView(ListView):
     template_name = 'blog/category.html'
     paginate_by = MAX_POSTS_ON_PAGE
 
+    def get_category(self):
+        category = get_object_or_404(
+            Category,
+            slug=self.kwargs['category_slug'],
+            is_published=True
+        )
+        return category
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        category = get_filtered_category(self.kwargs['category_slug'])
-        context['category'] = category
+        context['category'] = self.get_category()
         return context
 
     def get_queryset(self):
-        category = get_filtered_category(self.kwargs['category_slug'])
-        return get_filtered_posts(posts=category.posts)
+        return get_filtered_posts(posts=self.get_category().posts)
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -140,9 +146,10 @@ class ProfileDetailView(ListView):
         return context
 
     def get_queryset(self):
-        author = get_object_or_404(User, username=self.kwargs['username'])
+        author = get_object_or_404(User,
+                                   username=self.kwargs[self.pk_url_kwarg])
         return get_filtered_posts(posts=author.posts,
-                                  filter=self.request.user is author)
+                                  filter=self.request.user != author)
 
 
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
