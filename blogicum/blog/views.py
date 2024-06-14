@@ -15,10 +15,11 @@ from .models import Category, Comment, Post, User
 MAX_POSTS_ON_PAGE = 10
 
 
-def get_filtered_posts(posts_object, filter=True):
-    posts = posts_object.select_related(
-        'author', 'location', 'category'
-    )
+def get_filtered_posts(posts=Post.objects, filter=True, select_related=True):
+    if select_related:
+        posts = posts.select_related(
+            'author', 'location', 'category'
+        )
     if filter:
         posts = posts.filter(
             pub_date__lte=Now(),
@@ -28,6 +29,14 @@ def get_filtered_posts(posts_object, filter=True):
     return posts.annotate(
         comment_count=Count('comments')
     ).order_by(*Post._meta.ordering)
+
+
+def get_filtered_category(slug):
+    return get_object_or_404(
+        Category,
+        slug=slug,
+        is_published=True
+    )
 
 
 class UserIsAuthorMixin:
@@ -43,7 +52,7 @@ class IndexListView(ListView):
     model = Post
     template_name = 'blog/index.html'
     context_object_name = 'paje_obj'
-    queryset = get_filtered_posts(Post.objects)
+    queryset = get_filtered_posts()
     paginate_by = MAX_POSTS_ON_PAGE
 
 
@@ -56,19 +65,15 @@ class PostDetailView(DetailView):
     def get_object(self):
         post = super().get_object()
         if self.request.user != post.author:
-            return get_object_or_404(get_filtered_posts(Post.objects),
-                                     pk=self.kwargs['post_id'])
+            return get_object_or_404(get_filtered_posts(select_related=False),
+                                     pk=self.kwargs[self.pk_url_kwarg])
         return post
 
     def get_context_data(self, **kwargs):
-        post = get_object_or_404(
-            Post,
-            pk=self.kwargs[self.pk_url_kwarg]
-        )
+        post = self.get_object()
         context = super().get_context_data(**kwargs)
         context['post'] = post
-        context['comments'] = post.comments.select_related(
-            'author').order_by(*Comment._meta.ordering)
+        context['comments'] = post.comments.select_related('author')
         context['form'] = CommentForm()
         return context
 
@@ -80,21 +85,13 @@ class CategoryListView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        category = get_object_or_404(
-            Category,
-            slug=self.kwargs['category_slug'],
-            is_published=True
-        )
+        category = get_filtered_category(self.kwargs['category_slug'])
         context['category'] = category
         return context
 
     def get_queryset(self):
-        category = get_object_or_404(
-            Category,
-            slug=self.kwargs['category_slug'],
-            is_published=True
-        )
-        return get_filtered_posts(category.posts)
+        category = get_filtered_category(self.kwargs['category_slug'])
+        return get_filtered_posts(posts=category.posts)
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -129,14 +126,6 @@ class PostDeleteView(UserIsAuthorMixin, DeleteView):
     pk_url_kwarg = 'post_id'
     success_url = reverse_lazy('blog:index')
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        instance = self.get_object()
-        form = PostForm(self.request.POST or None,
-                        instance=instance)
-        context['form'] = form
-        return context
-
 
 class ProfileDetailView(ListView):
     model = Post
@@ -151,10 +140,9 @@ class ProfileDetailView(ListView):
         return context
 
     def get_queryset(self):
-        user = get_object_or_404(User, username=self.kwargs['username'])
-        if self.request.user.username == self.kwargs['username']:
-            return get_filtered_posts(user.posts, filter=False)
-        return get_filtered_posts(user.posts)
+        author = get_object_or_404(User, username=self.kwargs['username'])
+        return get_filtered_posts(posts=author.posts,
+                                  filter=self.request.user is author)
 
 
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):

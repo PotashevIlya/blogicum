@@ -98,12 +98,10 @@ class Comment(models.Model):
         User,
         on_delete=models.CASCADE,
         verbose_name='Автор',
-        related_name='comments',
     )
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        related_name='comments',
     )
     created_at = models.DateTimeField('Добавлено', auto_now_add=True)
 
@@ -111,3 +109,4 @@ class Comment(models.Model):
         ordering = ('created_at',)
         verbose_name = 'комментарий'
         verbose_name_plural = 'Комментарии'
+        default_related_name = 'comments'
