@@ -31,14 +31,6 @@ def get_filtered_posts(posts=Post.objects, filter=True, select_related=True):
     ).order_by(*Post._meta.ordering)
 
 
-def get_filtered_category(slug):
-    return get_object_or_404(
-        Category,
-        slug=slug,
-        is_published=True
-    )
-
-
 class UserIsAuthorMixin:
 
     def dispatch(self, request, *args, **kwargs):
