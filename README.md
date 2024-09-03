@@ -30,3 +30,11 @@ python manage.py migrate
 ```
 python manage.py runserver
 ```
+### Технологический стек :bulb:
+- Языки и фреймворки  
+  - python  
+  - django  
+
+___  
+#### Автор проекта:  
+:small_orange_diamond: [Поташев Илья](https://github.com/PotashevIlya)  
